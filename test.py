@@ -100,6 +100,7 @@ def main(args):
 
     # TODO: Build Eval_dataloader from Eval_DS
     for shot_selector_func in [shot_selectors.random, shot_selectors.closest, shot_selectors.ours]:
+        print(shot_selector_func)
         for repeat in range(4):
             shot_selector = shot_selector_func(trainset, args.shot_num, resolver=resolver, policy=policy, env=env)
             acc = test(language_model, tokenizer, test_dataloader, shot_selector, args)

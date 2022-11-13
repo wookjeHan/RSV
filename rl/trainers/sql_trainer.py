@@ -112,7 +112,7 @@ class SQLTrainer:
             states = self.env.reset(resolved_inputs, 'train')
 
             for step in range(self.shot_num):
-                actions, _ = self.policy.get_actions(states, max_action=True)
+                actions = self.policy.get_actions(states, max_action=True)
                 states, rewards = self.env.step(actions)
 
             correct += (rewards > 0).detach().tolist()
