@@ -1,3 +1,4 @@
+import random
 import numpy as np
 import torch
 
@@ -23,3 +24,33 @@ def fanin_init(tensor):
         raise Exception("Shape must be have dimension at least 2.")
     bound = 1. / np.sqrt(fan_in)
     return tensor.data.uniform_(-bound, bound)
+
+def topk_filter(tensor, k):
+    if k == 0:
+        return tensor
+
+    topk, _ = torch.topk(tensor, k=k)
+    thres = topk[:,:,-1].unsqueeze(-1)
+    return torch.where(tensor < thres, torch.full_like(tensor, float('-inf')), tensor)
+
+def fix_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+def get_exp_name(args):
+    return 'OURS'
+
+class Color:
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    GRAY = '\033[97m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'

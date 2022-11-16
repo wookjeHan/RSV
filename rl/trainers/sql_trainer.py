@@ -1,19 +1,18 @@
 import torch
 import torch.optim as optim
-import torch.nn.functional as F
+from torch import autograd
 
-from rl.samplers.sample import sample
+from rl.sampler import sample
 from rl.policies.mlp_policy import MlpPolicy
 from rl.envs.classification_env import ClassificationEnv
+from rl.loss import loss1, loss2
+from rl.logger import Logger
 
 from util.dataloader import DataModule
+from util.nlp import get_input_parameters, composite
+from shot_selectors import ours
 
 class SQLTrainer:
-    """Trainer that runs for a specified number of epochs. 
-
-    Each epoch can run for a specified number of batches.
-    Evaluation is done at the end of each epoch """
-
     def __init__(
         self,
         policy: MlpPolicy,
@@ -23,7 +22,7 @@ class SQLTrainer:
         language_model,
         resolver,
         shot_num,
-        
+
         # Train params
         trainset,
         valset,
@@ -48,13 +47,13 @@ class SQLTrainer:
         self.soft_update_ratio = train_variants['soft_update_ratio']
         self.update_period = train_variants['update_period']
         self.num_train_epochs = train_variants['num_epochs']
+        self.temperature = train_variants['temperature']
+        self.topk = train_variants['topk']
 
         self.testset = testset
         self.test_batch_size = test_variants['batch_size']
 
-        self.save_results = save_variants['save_results']
-        self.save_dir = save_variants['save_dir']
-        self.save_steps = save_variants['save_steps']
+        self.logger: Logger = save_variants['logger']
 
         self.optimizer = optim.Adam(policy.parameters(), lr=optimizer_variants['lr'])
 
@@ -62,34 +61,47 @@ class SQLTrainer:
         self.testdataloader_generator = DataModule(testset, resolver, self.test_batch_size, False)
 
     def compute_loss(self, batch):
-        # TODO: implement more refined loss
-        logits, target_logits, rewards = sample(
+        logits, target_logits, actions, rewards = sample(
             self.policy, self.target_policy, self.env, batch, self.shot_num
         )
 
-        value = logits.logsumexp(dim=-1)
-        target_value = target_logits.logsumexp(dim=-1)
-        return F.mse_loss(value, target_value)
+        l1 = loss1(logits, target_logits, actions, rewards, self.topk, self.temperature)
+        l2 = loss2(logits, target_logits, actions, rewards, self.topk, self.temperature)
+
+        l1r = loss1(target_logits, logits, actions, rewards, self.topk, self.temperature)
+        l2r = loss2(target_logits, logits, actions, rewards, self.topk, self.temperature)
+
+        self.logger.add_array_stat('loss1', l1)
+        self.logger.add_array_stat('loss2', l2)
+        self.logger.add_array_stat('loss1 reverse', l1r)
+        self.logger.add_array_stat('loss2 reverse', l2r)
+        self.logger.add_array_stat('train reward', rewards)
+
+        return 0.25 * (l1 + l2 + l1r + l2r)
 
     def update_target_policy(self):
         target_parameters = self.target_policy.parameters()
         source_parameters = self.policy.parameters()
         tau = self.soft_update_ratio
 
-        for target_param, param in zip(target_parameters, source_parameters):
+        for target_param, source_param in zip(target_parameters, source_parameters):
             target_param.data.copy_(
-                target_param.data * (1.0 - tau) + param.data * tau
+                target_param.data * (1.0 - tau) + source_param.data * tau
             )
 
     def train(self):
         train_dataloader = self.traindataloader_generator.get_dataloader()
 
         self.total_steps = 0
+        self.total_update_num = 0
 
         # Determine whether to train by epoch or steps
-        for epoch in range(self.num_train_epochs):
+        for self.epoch in range(self.num_train_epochs):
+            self.policy.train()
+            epoch_loss = []
             for step, batch in enumerate(train_dataloader):
                 loss = self.compute_loss(batch)
+                epoch_loss += loss.tolist()
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -97,25 +109,47 @@ class SQLTrainer:
 
                 if self.total_steps % self.update_period == 0:
                     self.update_target_policy()
+                    self.total_update_num += 1
 
             self.test()
-            
+            self.logger.add_scalar('Loss', epoch_loss.mean())
+            self.logger.add_scalar('Epoch', self.epoch)
+            self.logger.flush()
 
+    @torch.no_grad()
     def test(self):
-        test_dataloader = self.testdataloader_generator.get_dataloader()
+        shot_selector = ours(self.trainset, self.shot_num, self.resolver, self.policy, self.env)
+        predictions = []
+        labels = []
+        dataloader = self.testdataloader_generator.get_dataloader()
 
-        self.policy.eval()
-        correct = []
-        total_rewards = []
+        for resolved_batch in dataloader:
+            # The batch is consisted of prefix, concatenator, suffix, resolved_input, label, and verbalizers
+            batch_size = len(resolved_batch['resolved_input'])
+            verbalizers = resolved_batch['verbalizers']
+            class_num = len(verbalizers)
 
-        for resolved_inputs in test_dataloader:
-            states = self.env.reset(resolved_inputs, 'train')
+            # Shots are selected based on the batch
+            # The datastructure of shots is a list of string (batch_size, shot_num)
+            shots = shot_selector(resolved_batch)
 
-            for step in range(self.shot_num):
-                actions = self.policy.get_actions(states, max_action=True)
-                states, rewards = self.env.step(actions)
+            # Construct the list of strings based on the components of batch and shots
+            inputs = composite(resolved_batch, shots)
 
-            correct += (rewards > 0).detach().tolist()
-            total_rewards += rewards.detach().tolist()
+            # get tokenized ids and attention masks
+            verb_input_ids, verb_att_mask, loss_att_mask = get_input_parameters(
+                self.tokenizer, inputs, batch_size, class_num, verbalizers
+            )
 
-        print(f"Test Set Acc {sum(correct) / len(correct) * 100}% | Mean Reward {sum(total_rewards) / len(total_rewards)}")
+            prediction = self.language_model(
+                verb_input_ids,
+                verb_att_mask,
+                loss_att_mask,
+                level='predict',
+            )
+
+            labels += resolved_batch['label']
+            predictions += prediction.tolist()
+
+        acc = torch.sum(torch.tensor(predictions) == torch.tensor(labels)) / len(predictions) * 100
+        self.logger.add_scalar('Test Acc', acc)

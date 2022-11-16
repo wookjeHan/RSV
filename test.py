@@ -1,6 +1,5 @@
 import argparse
 import torch
-import pytorch_lightning as pl
 
 from transformers import AutoTokenizer
 from language_model import ClassificationModel
@@ -11,6 +10,7 @@ from rl.envs.classification_env import ClassificationEnv
 
 from util.dataloader import DataModule
 from util.nlp import composite, get_input_parameters
+from util.etc import fix_seed
 
 import resolvers
 import shot_selectors
@@ -34,7 +34,7 @@ def test(language_model, tokenizer, test_dataloader, shot_selector, args):
 
         # Construct the list of strings based on the components of batch and shots
         inputs = composite(resolved_batch, shots)
-        
+
         # get tokenized ids and attention masks
         verb_input_ids, verb_att_mask, loss_att_mask = get_input_parameters(
             tokenizer, inputs, batch_size, class_num, verbalizers
@@ -50,16 +50,16 @@ def test(language_model, tokenizer, test_dataloader, shot_selector, args):
         labels += resolved_batch['label']
         predictions += prediction.tolist()
 
-    acc = torch.sum(torch.tensor(predictions) == torch.tensor(labels)) / len(predictions) 
+    acc = torch.sum(torch.tensor(predictions) == torch.tensor(labels)) / len(predictions)
     return acc.item()
 
 def main(args):
     # Random seed
-    pl.seed_everything(args.seed)
+    fix_seed(args.seed)
 
     # Datasets
     # TODO: split superglue_cb into super_glue and cb
-    dataset = load_dataset('super_glue', 'cb')  
+    dataset = load_dataset('super_glue', 'cb')
     total_trainset = list(dataset['train'])
     total_valset = list(dataset['validation'])
     trainset_size = len(total_trainset)
@@ -73,7 +73,7 @@ def main(args):
     resolver = getattr(getattr(resolvers, args.dataset), args.prompt)
     sample_shot = resolver(trainset[0:1])
     verbalizers = sample_shot['verbalizers']
-    
+
     # Dataloader
     test_dataloader = DataModule(testset, resolver=resolver, batch_size=args.batch_size).get_dataloader()
 
@@ -96,7 +96,7 @@ def main(args):
         verbalizers,
         2.0,
         1.0,
-    )    
+    )
 
     # TODO: Build Eval_dataloader from Eval_DS
     for shot_selector_func in [shot_selectors.random, shot_selectors.closest, shot_selectors.ours]:
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--language_model', type=str, default='gpt2')
     parser.add_argument('--dataset', type=str, default='superglue_cb')
     parser.add_argument('--prompt', type=str, default='manual')
-    
+
     parser.add_argument('--batch_size', type=int, default=GlobalConfig.batch_size)
     parser.add_argument('--shot_num', type=int, default=GlobalConfig.shot_num)
     parser.add_argument('--tv_split_ratio', type=float, default=GlobalConfig.tv_split_ratio)

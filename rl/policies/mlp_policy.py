@@ -3,12 +3,12 @@ import torch.nn as nn
 from torch.distributions.categorical import Categorical
 
 from rl.networks.mlp import Mlp
+from util.etc import topk_filter
 
 class MlpPolicy(nn.Module):
-    def __init__(self, trainset_size):
+    def __init__(self, embedding_size, hidden_layer_sizes, trainset_size):
         super().__init__()
-        self.trainset_size = trainset_size
-        self.mlp = Mlp(1024, [2048], trainset_size)
+        self.mlp = Mlp(embedding_size, hidden_layer_sizes, trainset_size)
 
     def forward(self, states):
         return self.mlp(states)
@@ -23,13 +23,13 @@ class MlpPolicy(nn.Module):
         '''
         returns logits
         '''
-        return self.forward(states)
+        return self.get_actions_logits(states)[1]
 
     def get_actions_logits(self, states, max_action=False):
         '''
         returns a tuple of actions and logits
         '''
-        logits = self.get_logits(states)
+        logits = self.forward(states)
         if max_action:
             actions = torch.argmax(logits, dim=-1)
         else:
