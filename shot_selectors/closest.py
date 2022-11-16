@@ -6,11 +6,11 @@ class ClosestShotSelector():
         self.trainset = trainset
         self.shot_num = shot_num
         self.resolver = resolver
-    
+
         self.embedder = SentenceTransformer('stsb-roberta-large')
         self.embeddings = []
         self._calculate_embedding()
-        
+
     def _calculate_embedding(self):
         inputs = self.resolver(self.trainset, include_label=False)
         self.embeddings = self.embedder.encode(inputs['resolved_input'], convert_to_tensor=True, show_progress_bar=False)

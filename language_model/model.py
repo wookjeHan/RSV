@@ -16,9 +16,9 @@ class ClassificationModel(nn.Module):
         labels -> list of labels len -> batch
         First we assume that verbalizers is single token
         This can be changed to multi tokens
-        
+
         outputs
-        level 0 -> logits (batch, world_size) bef softmax 
+        level 0 -> logits (batch, world_size) bef softmax
         level 1 -> logits (batch, len(verbalizer)) bef softmax
         level 2 -> prediction (batch)
         level 3 -> acc float
@@ -28,7 +28,7 @@ class ClassificationModel(nn.Module):
         input_ids = input_ids.view(batch_size * class_num, seq_len).cuda() # batch_size * class_num, seq_len
         att_mask = att_mask.view(batch_size * class_num, seq_len).cuda() # batch_size * class_num, seq_len
         loss_att_mask = loss_att_mask.view(batch_size * class_num, seq_len).cuda() # batch_size * class_num, seq_len
-        
+
         tok_label_ids = input_ids[:,1:].reshape(-1) # batch_size * class_num * (seq_len - 1)
         model_outputs = self.transformers(input_ids=input_ids, attention_mask=att_mask)
         logits = model_outputs.logits[:,:-1,:]
@@ -44,7 +44,7 @@ class ClassificationModel(nn.Module):
 
         prob = (-loss).exp()
         prob = nn.functional.normalize(prob, p=1, dim=1)
-    
+
         if level == 'loss':
             return loss
         if level == 'prob':
