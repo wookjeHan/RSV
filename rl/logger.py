@@ -1,25 +1,30 @@
 import os
 from os.path import join as opj
+from torch import save
 from torch import Tensor
 from collections import OrderedDict
 from statistics import mean, stdev
 
 class Logger:
-    def __init__(self, base_dir, text_output_path, tab_output_path):
+    def __init__(self, base_dir, text_output_path, tab_output_path, snapshot_save_path):
         text_output_dir = opj(base_dir, text_output_path)
         tab_output_dir = opj(base_dir, tab_output_path)
+        snapshot_save_dir = opj(base_dir, snapshot_save_path)
 
         os.makedirs(text_output_dir, exist_ok=True)
         os.makedirs(tab_output_dir, exist_ok=True)
+        os.makedirs(snapshot_save_dir, exist_ok=True)
 
         text_output_path = opj(text_output_dir, "log.txt")
         tab_output_path = opj(tab_output_dir, "stat.csv")
 
         self.text_printer = open(text_output_path, 'w')
         self.tab_printer = open(tab_output_path, 'w')
+        self.snapshot_save_dir = snapshot_save_dir
 
         print(f"Log text output as txt format to {text_output_path}")
         print(f"Log tabular output as csv format to {tab_output_path}")
+        print(f"Snapshots will be saved to {snapshot_save_dir}")
 
         self.tab_title_printed = False
         self.buffer = OrderedDict()
@@ -95,3 +100,7 @@ class Logger:
 
         self.buffer = OrderedDict()
         self.added = {}
+
+    def save_snapshot(self, object, epoch):
+        snapshot_save_path = opj(self.snapshot_save_dir, f"itr_{epoch}.pt")
+        save(object, snapshot_save_path)

@@ -10,15 +10,15 @@ from rl.envs.classification_env import ClassificationEnv
 
 from util.dataloader import DataModule
 from util.nlp import composite, get_input_parameters
-from util.etc import fix_seed
+from util.etc import fix_seed, get_exp_name
 
 import resolvers
 import shot_selectors
-from config import GlobalConfig
+from config import GlobalConfig, TestSnapshotIndex as tsi
 
 
 @torch.no_grad()
-def test(language_model, tokenizer, test_dataloader, shot_selector, args):
+def test(language_model, tokenizer, test_dataloader, shot_selector):
     predictions = []
     labels = []
 
@@ -63,7 +63,8 @@ def main(args):
     total_trainset = list(dataset['train'])
     total_valset = list(dataset['validation'])
     trainset_size = len(total_trainset)
-    split_idx = int(trainset_size * args.tv_split_ratio)
+    tv_split_ratio = tsi.tv_split_ratio
+    split_idx = int(trainset_size * tv_split_ratio)
 
     trainset = total_trainset[:split_idx] # Train dataset -> list of data(Dictionary)
     valset = total_trainset[split_idx:] # Validation dataset -> list of data(Dictionary)
@@ -86,7 +87,11 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.language_model)
     tokenizer.pad_token = tokenizer.eos_token
 
-    policy = MlpPolicy(len(trainset)).cuda()
+    M = len(trainset)
+    policy = MlpPolicy(1024, [2 * M, 2 * M], M).cuda()
+    exp_name = get_exp_name(tsi)
+    state_dict = torch.load(f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt")
+    policy.load_state_dict(state_dict)
     env = ClassificationEnv(
         trainset,
         resolver,
@@ -94,8 +99,8 @@ def main(args):
         language_model,
         tokenizer,
         verbalizers,
-        2.0,
-        1.0,
+        200.0,
+        180.0,
     )
 
     # TODO: Build Eval_dataloader from Eval_DS
@@ -103,7 +108,7 @@ def main(args):
         print(shot_selector_func)
         for repeat in range(4):
             shot_selector = shot_selector_func(trainset, args.shot_num, resolver=resolver, policy=policy, env=env)
-            acc = test(language_model, tokenizer, test_dataloader, shot_selector, args)
+            acc = test(language_model, tokenizer, test_dataloader, shot_selector)
             print(f"[{repeat:1d}/4] Accuracy {acc:.3f}")
             del shot_selector
 
@@ -117,7 +122,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--batch_size', type=int, default=GlobalConfig.batch_size)
     parser.add_argument('--shot_num', type=int, default=GlobalConfig.shot_num)
-    parser.add_argument('--tv_split_ratio', type=float, default=GlobalConfig.tv_split_ratio)
     args = parser.parse_args()
 
     main(args)

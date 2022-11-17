@@ -1,7 +1,13 @@
 __pycache__
 */__pycache__
+
 data
 sql
-*.png
+slurm
 result
+plot
+
+*.png
+run.py
 sandbox.py
+plot.py

@@ -13,7 +13,7 @@ from rl.logger import Logger
 from util.etc import set_device, get_device, fix_seed, get_exp_name
 
 import resolvers
-from config import GlobalConfig
+from config import GlobalConfig as gc
 
 # torch.set_printoptions(threshold=10_000)
 
@@ -52,9 +52,9 @@ def main(args):
     tokenizer.pad_token = tokenizer.eos_token
 
     # Policies
-    M = 1024
-    policy = MlpPolicy(1024, [M, M, M], len(trainset)).to(device=device)
-    target_policy = MlpPolicy(1024, [M, M, M], len(trainset)).to(device=device)
+    M = len(trainset)
+    policy = MlpPolicy(1024, [2 * M, 2 * M], M).to(device=device)
+    target_policy = MlpPolicy(1024, [2 * M, 2 * M], M).to(device=device)
 
     # Env
     env = ClassificationEnv(
@@ -64,8 +64,8 @@ def main(args):
         language_model,
         tokenizer,
         verbalizers,
-        2.0,
-        1.0,
+        200.0,
+        180.0,
     )
 
     # Logger
@@ -74,7 +74,7 @@ def main(args):
         result_dir = os.path.join(exp_name, str(args.seed))
     else:
         result_dir = 'DEBUG'
-    logger = Logger('result', result_dir, result_dir)
+    logger = Logger('result', result_dir, result_dir, result_dir)
 
     # Variants
     train_variants = {
@@ -82,7 +82,7 @@ def main(args):
         'shuffle': True,
         'soft_update_ratio': 1.0, # 1.0 for hard update, 0.0 for no update
         'update_period': 10,
-        'num_epochs': 1000,
+        'num_epochs': 200,
         'temperature': args.temperature,
         'topk': args.topk,
     }
@@ -91,9 +91,12 @@ def main(args):
     }
     optimizer_variants = {
         'lr': 3e-4,
+        'weight_decay': args.weight_decay,
     }
     save_variants = {
         'logger': logger,
+        'save_mode': args.save_mode,
+        'save_freq': args.save_freq,
     }
 
     # Trainer
@@ -124,13 +127,18 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='superglue_cb')
     parser.add_argument('--prompt', type=str, default='manual')
 
-    parser.add_argument('--batch_size', type=int, default=GlobalConfig.batch_size)
-    parser.add_argument('--shot_num', type=int, default=GlobalConfig.shot_num)
+    parser.add_argument('--batch_size', type=int, default=gc.batch_size)
+    parser.add_argument('--lr', type=float, default=3e-4)
+    parser.add_argument('--weight_decay', type=float, default=0.1)
+    parser.add_argument('--shot_num', type=int, default=gc.shot_num)
     parser.add_argument('--topk', type=int, default=5)
     parser.add_argument('--temperature', type=float, default=1.0)
-    parser.add_argument('--tv_split_ratio', type=float, default=GlobalConfig.tv_split_ratio)
+    parser.add_argument('--tv_split_ratio', type=float, default=gc.tv_split_ratio)
 
     parser.add_argument('--save_result', action='store_true')
+    parser.add_argument('--save_mode', type=str, default='freq', choices=['last', 'freq'])
+    parser.add_argument('--save_freq', type=int, default=10)
+    parser.add_argument('--exp_name', type=str, default='OURS')
     args = parser.parse_args()
 
     main(args)

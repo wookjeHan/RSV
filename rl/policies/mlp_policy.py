@@ -35,3 +35,6 @@ class MlpPolicy(nn.Module):
         else:
             actions = Categorical(logits=logits).sample()
         return actions, logits
+
+    def get_weight_sum(self):
+        return self.mlp.get_weight_sum()

@@ -44,3 +44,13 @@ class Mlp(nn.Module):
         preactivation = self.last_fc(h)
         return self.output_activation(preactivation)
 
+    def get_weight_sum(self):
+        weight_sum = 0
+        for fc in self.fcs:
+            weight_sum += fc.weight.norm(p=1)
+            weight_sum += fc.bias.norm(p=1)
+
+        weight_sum += self.last_fc.weight.norm(p=1)
+        weight_sum += self.last_fc.bias.norm(p=1)
+
+        return weight_sum.item()
