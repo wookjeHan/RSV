@@ -77,7 +77,7 @@ class SQLTrainer:
         self.logger.add_array_stat('loss2 reverse', l2r)
         self.logger.add_array_stat('train reward', rewards)
 
-        return 0.25 * (l1 + l2 + l1r + l2r).mean()
+        return 0.25 * (l1 + l2 + l1r + l2r).mean(), rewards > 0
 
     def update_target_policy(self):
         target_parameters = self.target_policy.parameters()
@@ -99,11 +99,15 @@ class SQLTrainer:
         for self.epoch in range(self.num_train_epochs):
             self.policy.train()
             epoch_loss = 0
+            corrects = 0
             dataset_size = 0
             for step, batch in enumerate(train_dataloader):
-                loss = self.compute_loss(batch)
-                epoch_loss += loss.item() * len(batch)
-                dataset_size += len(batch)
+                loss, correct = self.compute_loss(batch)
+
+                epoch_loss += loss.item() * len(correct)
+                corrects += correct.long().sum()
+                dataset_size += len(correct)
+
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -113,8 +117,9 @@ class SQLTrainer:
                     self.update_target_policy()
                     self.total_update_num += 1
 
+            self.logger.add_scalar('Train Loss', epoch_loss / dataset_size)
+            self.logger.add_scalar('Train Acc', corrects / dataset_size * 100)
             self.test()
-            self.logger.add_scalar('Loss', epoch_loss / dataset_size)
             self.logger.add_scalar('Epoch', self.epoch)
             self.logger.flush()
 

@@ -12,8 +12,14 @@ class Logger:
         os.makedirs(text_output_dir, exist_ok=True)
         os.makedirs(tab_output_dir, exist_ok=True)
 
-        self.text_printer = open(opj(text_output_dir, "log.txt"), 'w')
-        self.tab_printer = open(opj(tab_output_dir, "stat.csv"), 'w')
+        text_output_path = opj(text_output_dir, "log.txt")
+        tab_output_path = opj(tab_output_dir, "stat.csv")
+
+        self.text_printer = open(text_output_path, 'w')
+        self.tab_printer = open(tab_output_path, 'w')
+
+        print(f"Log text output as txt format to {text_output_path}")
+        print(f"Log tabular output as csv format to {tab_output_path}")
 
         self.tab_title_printed = False
         self.buffer = OrderedDict()

@@ -39,8 +39,16 @@ def fix_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-def get_exp_name(args):
-    return 'OURS'
+def get_exp_name(args, trim=False):
+    if trim:
+        return f"sn{args.shot_num}_k{args.topk}_t{args.temperature}"
+    else:
+        return os.path.join(
+            'OURS',
+            f"{args.dataset}_sr{args.tv_split_ratio}",
+            args.prompt,
+            f"sn{args.shot_num}_k{args.topk}_t{args.temperature}",
+        ) 
 
 class Color:
     PURPLE = '\033[95m'

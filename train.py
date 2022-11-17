@@ -1,9 +1,9 @@
+import os
 import argparse
 
 from transformers import AutoTokenizer
 from language_model import ClassificationModel
 from datasets import load_dataset
-import torch
 
 from rl.policies.mlp_policy import MlpPolicy
 from rl.envs.classification_env import ClassificationEnv
@@ -65,12 +65,16 @@ def main(args):
         tokenizer,
         verbalizers,
         2.0,
-        1.0
+        1.0,
     )
 
     # Logger
-    exp_name = get_exp_name(args)
-    logger = Logger('result', exp_name, exp_name)
+    if args.save_result:
+        exp_name = get_exp_name(args)
+        result_dir = os.path.join(exp_name, str(args.seed))
+    else:
+        result_dir = 'DEBUG'
+    logger = Logger('result', result_dir, result_dir)
 
     # Variants
     train_variants = {
@@ -125,6 +129,8 @@ if __name__ == '__main__':
     parser.add_argument('--topk', type=int, default=5)
     parser.add_argument('--temperature', type=float, default=1.0)
     parser.add_argument('--tv_split_ratio', type=float, default=GlobalConfig.tv_split_ratio)
+
+    parser.add_argument('--save_result', action='store_true')
     args = parser.parse_args()
 
     main(args)
