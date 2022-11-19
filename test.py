@@ -90,8 +90,11 @@ def main(args):
     M = len(trainset)
     policy = MlpPolicy(1024, [2 * M, 2 * M], M).cuda()
     exp_name = get_exp_name(tsi)
-    state_dict = torch.load(f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt")
-    policy.load_state_dict(state_dict)
+    try:
+        state_dict = torch.load(f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt")
+        policy.load_state_dict(state_dict)
+    except:
+        pass
     env = ClassificationEnv(
         trainset,
         resolver,

@@ -81,7 +81,7 @@ class ClassificationEnv():
         prob = self.language_model(verb_input_ids, verb_att_mask, loss_att_mask, level='prob')
         prob_ans = prob[range(self.threadn), self.label]
 
-        prob_copy = prob.detach()
+        prob_copy = prob.clone()
         prob_copy[range(self.threadn), self.label] = 0
         prob_adv, _ = prob_copy.max(dim=1)
 

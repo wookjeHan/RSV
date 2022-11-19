@@ -82,7 +82,7 @@ def main(args):
         'shuffle': True,
         'soft_update_ratio': 1.0, # 1.0 for hard update, 0.0 for no update
         'update_period': 10,
-        'num_epochs': 200,
+        'num_epochs': 1000,
         'temperature': args.temperature,
         'topk': args.topk,
     }
