@@ -6,8 +6,7 @@ from rl.envs.classification_env import ClassificationEnv
 from rl.loss import loss1, loss2
 from rl.logger import Logger
 
-from util.dataloader import DataModule
-from util.nlp import get_input_parameters, composite
+from util.dataset import DataModule
 from shot_selectors import ours
 from test import test
 

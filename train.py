@@ -3,7 +3,6 @@ import argparse
 
 from transformers import AutoTokenizer
 from language_model import ClassificationModel
-from datasets import load_dataset
 
 from rl.policies.mlp_policy import MlpPolicy
 from rl.envs.classification_env import ClassificationEnv
@@ -11,6 +10,7 @@ from rl.trainers.sql_trainer import SQLTrainer
 from rl.logger import Logger
 
 from util.etc import set_device, get_device, fix_seed, get_exp_name
+from util.dataset import get_splited_dataset
 
 import resolvers
 from config import GlobalConfig as gc
@@ -26,20 +26,7 @@ def main(args):
     device = get_device()
 
     # Datasets
-    # TODO: split superglue_cb into super_glue and cb
-    dataset = load_dataset('super_glue', 'cb')
-    total_trainset = list(dataset['train'])
-    total_valset = list(dataset['validation'])
-    trainset_size = len(total_trainset)
-    split_idx = int(trainset_size * args.tv_split_ratio)
-
-    trainset = total_trainset[:split_idx] # Train dataset -> list of data(Dictionary)
-    valset = total_trainset[split_idx:] # Validation dataset -> list of data(Dictionary)
-    testset = total_valset # Eval dataset -> list of data(Dictionary)
-
-    print("Trainset:", len(trainset))
-    print("Valset:", len(valset))
-    print("Testset:", len(testset))
+    trainset, valset, testset = get_splited_dataset(args)    
 
     # Resolver & Verbalizer
     resolver = getattr(getattr(resolvers, args.dataset), args.prompt)

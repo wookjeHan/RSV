@@ -2,13 +2,13 @@ import argparse
 import numpy as np
 
 from transformers import AutoTokenizer
-from language_model import ClassificationModel
+from language_model import DummyClassificationModel
 
 from rl.policies.mlp_policy import MlpPolicy
 from rl.envs.classification_env import ClassificationEnv
 
 from util.dataset import DataModule, get_splited_dataset
-from util.etc import fix_seed
+from util.etc import fix_seed, set_device
 
 import resolvers
 from config import GlobalConfig
@@ -16,6 +16,9 @@ from config import GlobalConfig
 def main(args):
     # Random seed
     fix_seed(args.seed)
+
+    # Use GPU
+    set_device('cuda')
 
     # Datasets
     trainset, valset, testset = get_splited_dataset(args)
@@ -29,11 +32,11 @@ def main(args):
     test_dataloader = DataModule(testset, resolver=resolver, batch_size=args.batch_size).get_dataloader()
 
     # Model
-    language_model = ClassificationModel(args.language_model)
+    language_model = DummyClassificationModel(args.language_model)
     tokenizer = AutoTokenizer.from_pretrained(args.language_model)
     tokenizer.pad_token = tokenizer.eos_token
 
-    policy = MlpPolicy(len(trainset)).cuda()
+    trainset = trainset[:6]
     env = ClassificationEnv(
         trainset,
         resolver,
@@ -45,18 +48,19 @@ def main(args):
         1.0,
     )
 
-    for repeat in range(20):
-        correct = []
-        for resolved_batch in test_dataloader:
-            states = env.reset(resolved_batch, 'train')
-
-            for step in range(args.shot_num):
-                actions = policy.get_actions(states, max_action=True)
-                states, rewards = env.step(actions)
-
-            correct += (rewards > 0).long().tolist()
-
-        print(f"[{repeat:2d}/20] Accuracy {np.array(correct).mean():.3f}")
+    for endo_train in [True, False]:
+        for replace in [True, False]:
+            print(f">>>endo train: {endo_train} replace: {replace}>>>")
+            policy = MlpPolicy(1024, [1024], len(trainset), replace).cuda()
+            for resolved_batch in test_dataloader:
+                print(f"initial indices: {resolved_batch['idx']}")
+                embeddings, action_mask = env.reset(resolved_batch, endo_train, 'train')
+                for step in range(args.shot_num):
+                    indices, replace = policy.get_actions((embeddings, action_mask), max_action=True)
+                    (embeddings, action_mask), rewards = env.step((indices, replace))
+                    print(f"{step}th indices: {indices.view(-1)}")
+                    print(f"{step}th action_mask:\n{action_mask.detach().cpu().numpy()}")
+                break
 
 
 if __name__ == '__main__':

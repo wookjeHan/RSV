@@ -10,6 +10,7 @@ def manual(inputs, include_label=False):
         'suffix': '\n\n',
         'resolved_input': [],
         'label': [],
+        'idx': [],
         'verbalizers': ['True', 'False'],
     }
     for input in inputs:
@@ -20,5 +21,6 @@ def manual(inputs, include_label=False):
 
         result['resolved_input'].append(resolved_input)
         result['label'].append(input['label'])
+        result['idx'].append(input['idx'])
 
     return result

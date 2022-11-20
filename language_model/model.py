@@ -51,3 +51,21 @@ class ClassificationModel(nn.Module):
             return prob
         elif level == 'predict':
             return torch.argmin(loss, dim=1)
+
+class DummyClassificationModel(nn.Module):
+    def __init__(self, model_name):
+        super().__init__()
+
+    def forward(self, input_ids: torch.Tensor, att_mask: torch.Tensor, loss_att_mask: torch.Tensor, level='loss'):
+        batch_size, class_num, seq_len = input_ids.shape
+        loss = torch.rand(batch_size, class_num)
+
+        prob = (-loss).exp()
+        prob = nn.functional.normalize(prob, p=1, dim=1)
+
+        if level == 'loss':
+            return loss
+        if level == 'prob':
+            return prob
+        elif level == 'predict':
+            return torch.argmin(loss, dim=1)

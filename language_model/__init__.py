@@ -1,1 +1,1 @@
-from language_model.model import ClassificationModel
+from language_model.model import ClassificationModel, DummyClassificationModel

@@ -2,6 +2,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 from util.nlp import get_input_parameters
+from util.etc import get_device
 
 class ClassificationEnv():
     '''
@@ -21,17 +22,32 @@ class ClassificationEnv():
         # TODO: fix it to recieve an embedder as a parameter
         self.embedder = SentenceTransformer('stsb-roberta-large')
 
-    def reset(self, resolved_batch, mode):
+    def reset(self, resolved_batch, endo_train, mode):
         '''
-        mode: 'train' or 'test'
+        mode: 'train' | 'test'
+        train: env is called during training, reward is calculated
+        test: env is called during test, reward is set to zero
+
+        endo_train: boolean
+        endo_train = True: batch is sampled from trainset (=shotset), action mask is enabled
+        endo_train = False: batch is exclusive to trainset (=shotset)
+
         '''
         self.stepn = 0
         self.mode = mode
 
         resolved_inputs = resolved_batch['resolved_input']
-        self.threadn = len(resolved_inputs)
-        self.state = (0, resolved_inputs)
+        indices = resolved_batch['idx']
 
+        batch_size = len(resolved_inputs)
+        action_mask = torch.ones(batch_size, len(self.trainset), device=get_device())
+
+        if endo_train:
+            action_mask[range(batch_size), indices] = 0
+
+        self.state = (0, resolved_inputs, action_mask)
+
+        self.threadn = batch_size
         embeddings = self.embedder.encode(resolved_inputs, convert_to_tensor=True,show_progress_bar=False)
 
         if mode == 'train':
@@ -39,12 +55,17 @@ class ClassificationEnv():
         else:
             self.label = None
 
-        return embeddings
 
-    def step(self, actions):
-        stepn, cur_inputs = self.state
+        return embeddings, action_mask
 
-        newshots = [self.trainset[action] for action in actions]
+    def step(self, action):
+        stepn, cur_inputs, action_mask = self.state
+        indices, replace = action
+
+        if not replace:
+            action_mask[range(self.threadn), indices] = 0
+
+        newshots = [self.trainset[index] for index in indices]
         resolved_result = self.resolver(newshots, include_label=True)
 
         resolved_newshots = resolved_result['resolved_input']
@@ -58,7 +79,7 @@ class ClassificationEnv():
             cur_inputs = [newshot + concatenator + cur_input for newshot, cur_input in zip(resolved_newshots, cur_inputs)]
 
         stepn += 1
-        self.state = (stepn, cur_inputs)
+        self.state = (stepn, cur_inputs, action_mask)
         done = stepn == self.shot_num
 
         if done and self.mode == 'train':
@@ -69,7 +90,7 @@ class ClassificationEnv():
 
         embeddings = self.embedder.encode(cur_inputs, convert_to_tensor=True,show_progress_bar=False)
 
-        return embeddings, rewards
+        return (embeddings, action_mask), rewards
 
     @torch.no_grad()
     def _get_reward(self, inputs):

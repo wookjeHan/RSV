@@ -8,7 +8,7 @@ from datasets import load_dataset
 from rl.policies.mlp_policy import MlpPolicy
 from rl.envs.classification_env import ClassificationEnv
 
-from util.dataloader import DataModule
+from util.dataset import DataModule, get_splited_dataset
 from util.nlp import composite, get_input_parameters
 from util.etc import fix_seed, get_exp_name
 
@@ -58,17 +58,7 @@ def main(args):
     fix_seed(args.seed)
 
     # Datasets
-    # TODO: split superglue_cb into super_glue and cb
-    dataset = load_dataset('super_glue', 'cb')
-    total_trainset = list(dataset['train'])
-    total_valset = list(dataset['validation'])
-    trainset_size = len(total_trainset)
-    tv_split_ratio = tsi.tv_split_ratio
-    split_idx = int(trainset_size * tv_split_ratio)
-
-    trainset = total_trainset[:split_idx] # Train dataset -> list of data(Dictionary)
-    valset = total_trainset[split_idx:] # Validation dataset -> list of data(Dictionary)
-    testset = total_valset # Eval dataset -> list of data(Dictionary)
+    trainset, valset, testset = get_splited_dataset(args)
 
     # Resolver & Verbalizer
     resolver = getattr(getattr(resolvers, args.dataset), args.prompt)
