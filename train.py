@@ -26,7 +26,7 @@ def main(args):
     device = get_device()
 
     # Datasets
-    trainset, valset, testset = get_splited_dataset(args)    
+    trainset, valset, testset = get_splited_dataset(args)
 
     # Resolver & Verbalizer
     resolver = getattr(getattr(resolvers, args.dataset), args.prompt)
@@ -40,14 +40,16 @@ def main(args):
 
     # Policies
     M = len(trainset)
-    policy = MlpPolicy(1024, [2 * M, 2 * M], M).to(device=device)
-    target_policy = MlpPolicy(1024, [2 * M, 2 * M], M).to(device=device)
+    policy = MlpPolicy(1024, [2 * M, 2 * M], M, replace=args.replace).to(device=device)
+    target_policy = MlpPolicy(1024, [2 * M, 2 * M], M, replace=args.replace).to(device=device)
 
     # Env
+    endo_train = args.tv_split_ratio == 0.0
     env = ClassificationEnv(
         trainset,
         resolver,
         args.shot_num,
+        endo_train,
         language_model,
         tokenizer,
         verbalizers,
@@ -69,7 +71,7 @@ def main(args):
         'shuffle': True,
         'soft_update_ratio': 1.0, # 1.0 for hard update, 0.0 for no update
         'update_period': 10,
-        'num_epochs': 1000,
+        'num_epochs': 500,
         'temperature': args.temperature,
         'topk': args.topk,
     }
@@ -121,6 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('--topk', type=int, default=5)
     parser.add_argument('--temperature', type=float, default=1.0)
     parser.add_argument('--tv_split_ratio', type=float, default=gc.tv_split_ratio)
+    parser.add_argument('--replace', action='store_true')
 
     parser.add_argument('--save_result', action='store_true')
     parser.add_argument('--save_mode', type=str, default='freq', choices=['last', 'freq'])

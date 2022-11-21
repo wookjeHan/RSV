@@ -8,7 +8,7 @@ class ClassificationEnv():
     '''
     Classification Env which can manage multiple rollout
     '''
-    def __init__(self, trainset, resolver, shot_num, language_model, tokenizer, verbalizers, correct_coeff, incorrect_coeff):
+    def __init__(self, trainset, resolver, shot_num, endo_train, language_model, tokenizer, verbalizers, correct_coeff, incorrect_coeff):
         self.trainset = trainset
         self.resolver = resolver
         self.shot_num = shot_num
@@ -18,11 +18,12 @@ class ClassificationEnv():
         self.class_num = len(verbalizers)
         self.correct_coeff = correct_coeff
         self.incorrect_coeff = incorrect_coeff
+        self.endo_train = endo_train
 
         # TODO: fix it to recieve an embedder as a parameter
         self.embedder = SentenceTransformer('stsb-roberta-large')
 
-    def reset(self, resolved_batch, endo_train, mode):
+    def reset(self, resolved_batch, mode):
         '''
         mode: 'train' | 'test'
         train: env is called during training, reward is calculated
@@ -42,7 +43,7 @@ class ClassificationEnv():
         batch_size = len(resolved_inputs)
         action_mask = torch.ones(batch_size, len(self.trainset), device=get_device())
 
-        if endo_train:
+        if self.endo_train:
             action_mask[range(batch_size), indices] = 0
 
         self.state = (0, resolved_inputs, action_mask)

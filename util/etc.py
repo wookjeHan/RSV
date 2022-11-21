@@ -41,9 +41,16 @@ def fix_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 def get_exp_name(args, trim=False):
-    exp_name = f"sn{args.shot_num}_k{args.topk}_t{args.temperature}"
+    exp_name = f"sn{args.shot_num}_k{args.topk}_lr{args.lr}"
+
     if args.weight_decay > 0.0:
         exp_name += f"_wd{args.weight_decay}"
+
+    if args.replace:
+        exp_name += f"_rep"
+
+    if args.tv_split_ratio == 0.0:
+        exp_name += f"_endo"
 
     if trim:
         return exp_name
@@ -53,7 +60,7 @@ def get_exp_name(args, trim=False):
             f"{args.dataset}_sr{args.tv_split_ratio}",
             args.prompt,
             exp_name
-        ) 
+        )
 
 class Color:
     PURPLE = '\033[95m'

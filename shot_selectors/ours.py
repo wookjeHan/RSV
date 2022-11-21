@@ -1,7 +1,8 @@
 import torch
+from rl.envs.classification_env import ClassificationEnv
 
 class OursShotSelector():
-    def __init__(self, trainset, shot_num, resolver, policy, env, **kwargs):
+    def __init__(self, trainset, shot_num, resolver, policy, env: ClassificationEnv, **kwargs):
         self.trainset = trainset
         self.shot_num = shot_num
         self.resolver = resolver
@@ -16,12 +17,12 @@ class OursShotSelector():
 
         states = self.env.reset(resolved_batch, mode='eval')
         for step in range(self.shot_num):
-            actions = self.policy.get_actions(states, max_action=True)
-            action_log[:,step] = actions
-            states, _ = self.env.step(actions)
+            indices, action_mask = self.policy.get_actions(states, max_action=True)
+            action_log[:,step] = indices
+            states, _ = self.env.step((indices, action_mask))
 
             for i in range(batch_size):
-                selected_datas[i].append(self.trainset[actions[i]])
+                selected_datas[i].append(self.trainset[indices[i]])
 
         shots = []
         # print(action_log)
