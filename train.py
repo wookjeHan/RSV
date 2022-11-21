@@ -44,18 +44,31 @@ def main(args):
     target_policy = MlpPolicy(1024, [2 * M, 2 * M], M, replace=args.replace).to(device=device)
 
     # Env
-    endo_train = args.tv_split_ratio == 0.0
-    env = ClassificationEnv(
+    endo_sample = args.tv_split_ratio == 0.0
+    train_env = ClassificationEnv(
         trainset,
         resolver,
         args.shot_num,
-        endo_train,
+        endo_sample,
         language_model,
         tokenizer,
         verbalizers,
         200.0,
         180.0,
     )
+
+    test_env = ClassificationEnv(
+        trainset,
+        resolver,
+        args.shot_num,
+        False,
+        language_model,
+        tokenizer,
+        verbalizers,
+        200.0,
+        180.0,
+    )
+
 
     # Logger
     if args.save_result:
@@ -88,11 +101,17 @@ def main(args):
         'save_freq': args.save_freq,
     }
 
+    print(f"train_variants: {train_variants}")
+    print(f"test_variants: {test_variants}")
+    print(f"optimizer_variants: {optimizer_variants}")
+    print(f"save_variants: {save_variants}")
+
     # Trainer
     trainer = SQLTrainer(
         policy,
         target_policy,
-        env,
+        train_env,
+        test_env,
         tokenizer,
         language_model,
         resolver,

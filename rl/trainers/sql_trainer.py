@@ -15,7 +15,8 @@ class SQLTrainer:
         self,
         policy: MlpPolicy,
         target_policy: MlpPolicy,
-        env: ClassificationEnv,
+        train_env: ClassificationEnv,
+        test_env: ClassificationEnv,
         tokenizer,
         language_model,
         resolver,
@@ -32,7 +33,8 @@ class SQLTrainer:
     ):
         self.policy = policy
         self.target_policy = target_policy
-        self.env = env
+        self.train_env = train_env
+        self.test_env = test_env
         self.tokenizer = tokenizer
         self.language_model = language_model
         self.resolver = resolver
@@ -67,7 +69,7 @@ class SQLTrainer:
 
     def _compute_loss(self, batch):
         logits, target_logits, actions, rewards = sample(
-            self.policy, self.target_policy, self.env, batch, self.shot_num
+            self.policy, self.target_policy, self.train_env, batch, self.shot_num
         )
 
         # print("train", actions.cpu().numpy())
@@ -136,7 +138,7 @@ class SQLTrainer:
 
     def _test(self):
         # Create a shot selector based on the current policy
-        shot_selector = ours(self.trainset, self.shot_num, self.resolver, self.policy, self.env)
+        shot_selector = ours(self.trainset, self.shot_num, self.resolver, self.policy, self.test_env)
 
         # Create a dataloader
         dataloader = self.testdataloader_generator.get_dataloader()
