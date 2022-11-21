@@ -92,7 +92,7 @@ def main(args):
         'batch_size': args.batch_size,
     }
     optimizer_variants = {
-        'lr': 3e-4,
+        'lr': args.lr,
         'weight_decay': args.weight_decay,
     }
     save_variants = {
