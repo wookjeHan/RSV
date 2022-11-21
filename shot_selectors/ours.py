@@ -12,7 +12,7 @@ class OursShotSelector():
 
     def __call__(self, resolved_batch):
         batch_size = len(resolved_batch['label'])
-        selected_datas = [[] for _ in range(batch_size)]
+        selected_datas = [[None for _ in range(self.shot_num)] for _ in range(batch_size)]
         action_log = torch.zeros(batch_size, self.shot_num)
 
         states = self.env.reset(resolved_batch, mode='eval')
@@ -22,7 +22,7 @@ class OursShotSelector():
             states, _ = self.env.step((indices, action_mask))
 
             for i in range(batch_size):
-                selected_datas[i].append(self.trainset[indices[i]])
+                selected_datas[i][self.shot_num - 1 - step] = self.trainset[indices[i]]
 
         shots = []
         # print(action_log)
