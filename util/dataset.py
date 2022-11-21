@@ -23,7 +23,7 @@ def get_splited_dataset(args):
     total_valset = list(dataset['validation'])
 
     # split total_trainset into trainset and valset
-    if args.tv_split_ratio > 0.0:
+    if hasattr(args, 'tv_split_ratio') and args.tv_split_ratio > 0.0:
         trainset_size = len(total_trainset)
         split_idx = int(trainset_size * args.tv_split_ratio)
 

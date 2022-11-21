@@ -10,7 +10,7 @@ from rl.envs.classification_env import ClassificationEnv
 
 from util.dataset import DataModule, get_splited_dataset
 from util.nlp import composite, get_input_parameters
-from util.etc import fix_seed, get_exp_name
+from util.etc import fix_seed, get_exp_name, set_device, get_device
 
 import resolvers
 import shot_selectors
@@ -57,8 +57,12 @@ def main(args):
     # Random seed
     fix_seed(args.seed)
 
+    # USe GPU
+    set_device('cuda')
+
     # Datasets
     trainset, valset, testset = get_splited_dataset(args)
+    shot_selector_trainset, _, _ = get_splited_dataset(tsi)
 
     # Resolver & Verbalizer
     resolver = getattr(getattr(resolvers, args.dataset), args.prompt)
@@ -68,27 +72,19 @@ def main(args):
     # Dataloader
     test_dataloader = DataModule(testset, resolver=resolver, batch_size=args.batch_size).get_dataloader()
 
-    print("Trainset:", len(trainset))
-    print("Valset:", len(valset))
-    print("Testset:", len(testset))
-
     # Model
     language_model = ClassificationModel(args.language_model)
     tokenizer = AutoTokenizer.from_pretrained(args.language_model)
     tokenizer.pad_token = tokenizer.eos_token
 
-    M = len(trainset)
-    policy = MlpPolicy(1024, [2 * M, 2 * M], M).cuda()
+    M = len(shot_selector_trainset)
+    policy = MlpPolicy(1024, [2 * M, 2 * M], M, tsi.replace).cuda()
     exp_name = get_exp_name(tsi)
-    try:
-        state_dict = torch.load(f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt")
-        policy.load_state_dict(state_dict)
-    except:
-        pass
     env = ClassificationEnv(
-        trainset,
+        shot_selector_trainset,
         resolver,
         args.shot_num,
+        tsi.tv_split_ratio == 0.0,
         language_model,
         tokenizer,
         verbalizers,
@@ -96,13 +92,17 @@ def main(args):
         180.0,
     )
 
-    # TODO: Build Eval_dataloader from Eval_DS
-    for shot_selector_func in [shot_selectors.random, shot_selectors.closest, shot_selectors.ours]:
+    for shot_selector_func in [shot_selectors.ours, shot_selectors.random, shot_selectors.closest]:
         print(shot_selector_func)
-        for repeat in range(4):
+        for seed in range(4):
+            if shot_selector_func == shot_selectors.ours:
+                tsi.seed = seed
+                snapshot_path = f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt"
+                state_dict = torch.load(snapshot_path, map_location=get_device())
+                policy.load_state_dict(state_dict)
             shot_selector = shot_selector_func(trainset, args.shot_num, resolver=resolver, policy=policy, env=env)
             acc = test(language_model, tokenizer, test_dataloader, shot_selector)
-            print(f"[{repeat:1d}/4] Accuracy {acc:.3f}")
+            print(f"[{seed:1d}/4] Accuracy {acc:.3f}")
             del shot_selector
 
 if __name__ == '__main__':

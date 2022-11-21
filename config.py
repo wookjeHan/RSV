@@ -14,10 +14,12 @@ class GlobalConfig:
 class TestSnapshotIndex:
     dataset = 'superglue_cb'
     prompt = 'manual'
-    tv_split_ratio = 0.3
+    tv_split_ratio = 0.0
     shot_num = 3
     topk = 8
     temperature = 1.0
-    weight_decay = 0.1
+    weight_decay = 0.5
+    replace = True
+    lr = 0.001
     seed = 0
-    epoch = 50
+    epoch = 490
