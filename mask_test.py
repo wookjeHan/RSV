@@ -8,7 +8,7 @@ from rl.policies.mlp_policy import MlpPolicy
 from rl.envs.classification_env import ClassificationEnv
 
 from util.dataset import DataModule, get_splited_dataset
-from util.etc import fix_seed, set_device
+from util.etc import fix_seed, set_device, Color
 
 import resolvers
 from config import GlobalConfig
@@ -37,24 +37,25 @@ def main(args):
     tokenizer.pad_token = tokenizer.eos_token
 
     trainset = trainset[:6]
-    env = ClassificationEnv(
-        trainset,
-        resolver,
-        args.shot_num,
-        language_model,
-        tokenizer,
-        verbalizers,
-        2.0,
-        1.0,
-    )
 
-    for endo_train in [True, False]:
+    for endo_sample in [True, False]:
+        env = ClassificationEnv(
+            trainset,
+            resolver,
+            args.shot_num,
+            endo_sample,
+            language_model,
+            tokenizer,
+            verbalizers,
+            2.0,
+            1.0,
+        )
         for replace in [True, False]:
-            print(f">>>endo train: {endo_train} replace: {replace}>>>")
+            print(f"{Color.RED}>>>endo sample: {endo_sample} replace: {replace}>>>{Color.END}")
             policy = MlpPolicy(1024, [1024], len(trainset), replace).cuda()
             for resolved_batch in test_dataloader:
                 print(f"initial indices: {resolved_batch['idx']}")
-                embeddings, action_mask = env.reset(resolved_batch, endo_train, 'train')
+                embeddings, action_mask = env.reset(resolved_batch, 'train')
                 for step in range(args.shot_num):
                     indices, replace = policy.get_actions((embeddings, action_mask), max_action=True)
                     (embeddings, action_mask), rewards = env.step((indices, replace))
