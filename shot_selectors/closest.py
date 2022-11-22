@@ -23,6 +23,6 @@ class ClosestShotSelector():
         shots = []
         for topk_idx in topk_indices:
             selected_data = [self.trainset[idx] for idx in topk_idx]
-            shots.append(self.resolver(selected_data, include_label=True)['resolved_input'])
+            shots.append(self.resolver(selected_data))
 
         return shots
