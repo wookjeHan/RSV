@@ -17,7 +17,9 @@ class SQLTrainer:
         target_policy: MlpPolicy,
         train_env: ClassificationEnv,
         test_env: ClassificationEnv,
+
         tokenizer,
+        truncator,
         language_model,
         resolver,
         shot_num,
@@ -35,7 +37,9 @@ class SQLTrainer:
         self.target_policy = target_policy
         self.train_env = train_env
         self.test_env = test_env
+
         self.tokenizer = tokenizer
+        self.truncator = truncator
         self.language_model = language_model
         self.resolver = resolver
         self.shot_num = shot_num
@@ -71,8 +75,6 @@ class SQLTrainer:
         logits, target_logits, actions, rewards = sample(
             self.policy, self.target_policy, self.train_env, batch, self.shot_num
         )
-
-        # print("train", actions.cpu().numpy())
 
         l1 = loss1(logits, target_logits, actions, rewards, self.topk, self.temperature)
         l2 = loss2(logits, target_logits, actions, rewards, self.topk, self.temperature)
@@ -143,7 +145,7 @@ class SQLTrainer:
         # Create a dataloader
         dataloader = self.testdataloader_generator.get_dataloader()
 
-        acc = test(self.language_model, self.tokenizer, dataloader, shot_selector)
+        acc = test(self.language_model, self.tokenizer, dataloader, shot_selector, self.truncator)
         self.logger.add_scalar('Test Acc', acc * 100)
 
     def _run_epoch(self):

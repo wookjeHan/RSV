@@ -88,12 +88,12 @@ def main(args):
         print(f">>>shot num {shot_num}>>>")
         env = ClassificationEnv(
             shot_selector_trainset,
+            tsi.tv_split_ratio == 0.0,
+            tokenizer,
+            truncator,
+            language_model,
             resolver,
             shot_num,
-            tsi.tv_split_ratio == 0.0,
-            language_model,
-            tokenizer,
-            verbalizers,
             200.0,
             180.0,
         )

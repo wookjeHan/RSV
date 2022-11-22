@@ -11,6 +11,7 @@ from rl.logger import Logger
 
 from util.etc import set_device, get_device, fix_seed, get_exp_name
 from util.dataset import get_splited_dataset
+from util.truncator import Truncator
 
 import resolvers
 from config import GlobalConfig as gc
@@ -37,6 +38,7 @@ def main(args):
     language_model = ClassificationModel(args.language_model)
     tokenizer = AutoTokenizer.from_pretrained(args.language_model)
     tokenizer.pad_token = tokenizer.eos_token
+    truncator = Truncator(tokenizer, args.max_seq_len, args.max_sample_seq_len)
 
     # Policies
     M = len(trainset)
@@ -44,38 +46,37 @@ def main(args):
     target_policy = MlpPolicy(1024, [2 * M, 2 * M], M, replace=args.replace).to(device=device)
 
     # Env
-    endo_sample = args.tv_split_ratio == 0.0
+    inner_sample = args.tv_split_ratio == 0.0
     train_env = ClassificationEnv(
         trainset,
+        inner_sample,
+        tokenizer,
+        truncator,
+        language_model,
         resolver,
         args.shot_num,
-        endo_sample,
-        language_model,
-        tokenizer,
-        verbalizers,
         200.0,
         180.0,
     )
 
     test_env = ClassificationEnv(
         trainset,
+        False,
+        tokenizer,
+        truncator,
+        language_model,
         resolver,
         args.shot_num,
-        False,
-        language_model,
-        tokenizer,
-        verbalizers,
         200.0,
         180.0,
     )
-
 
     # Logger
     if args.save_result:
         exp_name = get_exp_name(args)
         result_dir = os.path.join(exp_name, str(args.seed))
     else:
-        result_dir = 'DEBUG'
+        result_dir = args.exp_name
     logger = Logger('result', result_dir, result_dir, result_dir)
 
     # Variants
@@ -113,6 +114,7 @@ def main(args):
         train_env,
         test_env,
         tokenizer,
+        truncator,
         language_model,
         resolver,
         args.shot_num,
@@ -143,11 +145,13 @@ if __name__ == '__main__':
     parser.add_argument('--temperature', type=float, default=1.0)
     parser.add_argument('--tv_split_ratio', type=float, default=gc.tv_split_ratio)
     parser.add_argument('--replace', action='store_true')
+    parser.add_argument('--max_seq_len', type=int, default=1024)
+    parser.add_argument('--max_sample_seq_len', type=int, default=256)
 
     parser.add_argument('--save_result', action='store_true')
     parser.add_argument('--save_mode', type=str, default='freq', choices=['last', 'freq'])
     parser.add_argument('--save_freq', type=int, default=10)
-    parser.add_argument('--exp_name', type=str, default='OURS')
+    parser.add_argument('--exp_name', type=str, default='DEBUG')
     args = parser.parse_args()
 
     main(args)
