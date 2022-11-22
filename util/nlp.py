@@ -1,22 +1,6 @@
 import torch
 import torch.nn.functional as F
 
-def composite(batch, shots_list):
-    '''
-    Composite the batch and shots, which is a list of strings into forwardable sentence.
-    The order is prefix-shot1-concatenator-shot2-...-shotn-suffix-resolved_input
-    '''
-    results = []
-
-    for resolved_input, shots in zip(batch['resolved_input'], shots_list):
-        result = batch['prefix']
-        result += batch['concatenator'].join(shots)
-        result += batch['suffix']
-        result += resolved_input
-        results.append(result)
-
-    return results
-
 def get_input_parameters(tokenizer, inputs, batch_size, class_num, verbalizers):
     tok_result = tokenizer(inputs, padding=True) # batch_size, seq_len
     att_mask = torch.tensor(tok_result['attention_mask']).unsqueeze(1) # batch_size, 1, seq_len
