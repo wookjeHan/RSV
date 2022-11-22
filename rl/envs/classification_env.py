@@ -90,7 +90,6 @@ class ClassificationEnv:
 
         if done and self.mode == 'train':
             resolved_shots_batch = []
-            print(selected_indices)
             for i in range(self.batch_size):
                 shots = [self.trainset[int(idx)] for idx in selected_indices[i]]
                 resolved_shots_batch.append(self.resolver(shots))
