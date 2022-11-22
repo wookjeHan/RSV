@@ -48,6 +48,10 @@ class Logger:
             self.buffer[key] = values
             self.added[key] = 'array'
 
+    def simple_log(self, text):
+        self.text_printer.write(text + "\n")
+        print(text)
+
     def flush(self):
         text_output = ""
         methods = ['Min', 'Max', 'Mean', 'Stdev']
