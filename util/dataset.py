@@ -17,7 +17,8 @@ def _fix_index(dataset):
 
 def get_splited_dataset(args):
     # TODO: get super_glue and cb from args
-    dataset = load_dataset('super_glue', 'cb')
+    dataset_args = args.dataset.split(",")
+    dataset = load_dataset(*dataset_args)
 
     total_trainset = list(dataset['train'])
     total_valset = list(dataset['validation'])

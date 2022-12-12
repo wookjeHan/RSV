@@ -9,7 +9,7 @@ from rl.envs.classification_env import ClassificationEnv
 from rl.trainers.sql_trainer import SQLTrainer
 from rl.logger import Logger
 
-from util.etc import set_device, get_device, fix_seed, get_exp_name
+from util.etc import set_device, get_device, fix_seed, get_exp_name, print_variant
 from util.dataset import get_splited_dataset
 from util.truncator import Truncator
 
@@ -30,7 +30,8 @@ def main(args):
     trainset, valset, testset = get_splited_dataset(args)
 
     # Resolver & Verbalizer
-    resolver = getattr(getattr(resolvers, args.dataset), args.prompt)
+    resolver_name = "_".join(args.dataset.split(","))
+    resolver = getattr(getattr(resolvers, resolver_name), args.prompt)
     sample_shot = resolver(trainset[0:1])
     verbalizers = sample_shot['verbalizers']
 
@@ -85,7 +86,7 @@ def main(args):
         'shuffle': True,
         'soft_update_ratio': 1.0, # 1.0 for hard update, 0.0 for no update
         'update_period': 10,
-        'num_epochs': 500,
+        'num_epochs': 200,
         'temperature': args.temperature,
         'topk': args.topk,
     }
@@ -102,10 +103,10 @@ def main(args):
         'save_freq': args.save_freq,
     }
 
-    print(f"train_variants: {train_variants}")
-    print(f"test_variants: {test_variants}")
-    print(f"optimizer_variants: {optimizer_variants}")
-    print(f"save_variants: {save_variants}")
+    print_variant("train_variants", train_variants)
+    print_variant("test_variants", test_variants)
+    print_variant("optimizer_variants", optimizer_variants)
+    print_variant("save_variants", save_variants)
 
     # Trainer
     trainer = SQLTrainer(
@@ -134,7 +135,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
 
     parser.add_argument('--language_model', type=str, default='gpt2')
-    parser.add_argument('--dataset', type=str, default='superglue_cb')
+    parser.add_argument('--dataset', type=str, default='super_glue,cb')
     parser.add_argument('--prompt', type=str, default='manual')
 
     parser.add_argument('--batch_size', type=int, default=gc.batch_size)

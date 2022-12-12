@@ -1,2 +1,3 @@
-from .superglue_cb import *
-from .superglue_rte import *
+from .super_glue_cb import *
+from .super_glue_rte import *
+from .super_glue_boolq import *

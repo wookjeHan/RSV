@@ -1,9 +1,8 @@
 def manual(inputs, include_label=False):
-    format = '{}\nquestion: {}. true, false, or neither?\nanswer:{}'
+    format = '{}\nquestion: {}? \nanswer:{}'
     label_to_verb = {
-        0: 'true',
-        1: 'false',
-        2: 'neither',
+        0: ' no',
+        1: ' yes',
     }
     result = {
         'prefix': '',
@@ -12,13 +11,13 @@ def manual(inputs, include_label=False):
         'resolved_input': [],
         'label': [],
         'idx': [],
-        'verbalizers': ['true', 'false', 'neither'],
+        'verbalizers': [' no', ' yes'],
     }
     for input in inputs:
         if include_label:
-            resolved_input = format.format(input['premise'], input['hypothesis'], label_to_verb[input['label']])
+            resolved_input = format.format(input['passage'], input['question'], label_to_verb[input['label']])
         else:
-            resolved_input = format.format(input['premise'], input['hypothesis'], '')
+            resolved_input = format.format(input['passage'], input['question'], '')
 
         result['resolved_input'].append(resolved_input)
         result['label'].append(input['label'])
