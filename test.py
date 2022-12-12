@@ -1,5 +1,6 @@
 import argparse
 import torch
+import random
 
 from transformers import AutoTokenizer
 from language_model import ClassificationModel
@@ -62,14 +63,13 @@ def main(args):
 
     # Datasets
     trainset, valset, testset = get_splited_dataset(args)
-    shot_selector_trainset, _, _ = get_splited_dataset(tsi)
 
     # Resolver & Verbalizer
-    resolver = getattr(getattr(resolvers, args.dataset), args.prompt)
-    sample_shot = resolver(trainset[0:1])
-    verbalizers = sample_shot['verbalizers']
+    resolver_name = "_".join(args.dataset.split(","))
+    resolver = getattr(getattr(resolvers, resolver_name), args.prompt)
 
     # Dataloader
+    random.shuffle(testset)
     test_dataloader = DataModule(testset, resolver=resolver, batch_size=args.batch_size).get_dataloader()
 
     # Model
@@ -103,9 +103,14 @@ def main(args):
             for seed in range(4):
                 if shot_selector_func == shot_selectors.ours:
                     tsi.seed = seed
-                    snapshot_path = f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt"
-                    state_dict = torch.load(snapshot_path, map_location=get_device())
-                    policy.load_state_dict(state_dict)
+                    try:
+                        snapshot_path = f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt"
+                        print(snapshot_path)
+                        state_dict = torch.load(snapshot_path, map_location=get_device())
+                        policy.load_state_dict(state_dict)
+                        print(f"loading success from {snapshot_path}")
+                    except:
+                        pass
                     shot_selector = shot_selector_func(shot_selector_trainset, shot_num, resolver=resolver, policy=policy, env=env)
                 else:
                     shot_selector = shot_selector_func(trainset, shot_num, resolver=resolver, policy=policy, env=env)
@@ -118,10 +123,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
 
     parser.add_argument('--language_model', type=str, default='gpt2')
-    parser.add_argument('--dataset', type=str, default='superglue_cb')
+    parser.add_argument('--dataset', type=str, default='super_glue,cb')
     parser.add_argument('--prompt', type=str, default='manual')
 
-    parser.add_argument('--batch_size', type=int, default=GlobalConfig.batch_size)
+    parser.add_argument('--batch_size', type=int, default=8)
     args = parser.parse_args()
 
     main(args)
