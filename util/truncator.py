@@ -27,7 +27,7 @@ class Truncator:
         demonstrations = [resolved_inputs[i] + verbalizers[labels[i]] for i in range(shot_num)]
         composited_input = resolved_shots['concatenator'].join(demonstrations)
 
-        return composited_input + resolved_shots['suffix'] + input
+        return resolved_shots['prefix'] + composited_input + resolved_shots['suffix'] + input
 
     def truncate(self, resolved_shots_batch, input_batch):
         truncated_batch = []
@@ -74,7 +74,7 @@ class Truncator:
 
                 if self.max_seq_len < max_tok_len:
                     input_ids, tok_len = self._tokenize(composited_input)
-                    truncated_composited_input = self.tokenizer.decode(input_ids[tok_len - self.max_seq_len + verb_tok_len + 2:])
+                    truncated_composited_input = self.tokenizer.decode(input_ids[tok_len - self.max_seq_len + verb_tok_len + 2:]) # 2 is a margin
                     truncated_batch.append(truncated_composited_input)
                 else:
                     truncated_batch.append(composited_input)

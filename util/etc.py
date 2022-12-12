@@ -41,7 +41,7 @@ def fix_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 def get_exp_name(args, trim=False):
-    exp_name = f"sn{args.shot_num}_k{args.topk}_lr{args.lr}"
+    exp_name = f"sn{args.shot_num}_k{args.topk}_lr{args.lr}_bs{args.batch_size}"
 
     if args.weight_decay > 0.0:
         exp_name += f"_wd{args.weight_decay}"
@@ -61,6 +61,12 @@ def get_exp_name(args, trim=False):
             args.prompt,
             exp_name
         )
+
+def print_variant(name, variant):
+    print(name + ": {")
+    for key, item in variant.items():
+        print(f"\t{key}: {item},")
+    print("}")
 
 class Color:
     PURPLE = '\033[95m'
