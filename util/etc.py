@@ -50,7 +50,10 @@ def get_exp_name(args, trim=False):
         exp_name += f"_rep"
 
     if args.tv_split_ratio == 0.0:
-        exp_name += f"_endo"
+        exp_name += f"_inner"
+
+    if args.label_balance:
+        exp_name += f"_lb"
 
     if trim:
         return exp_name

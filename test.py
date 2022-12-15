@@ -15,8 +15,6 @@ from util.etc import fix_seed, get_exp_name, set_device, get_device
 
 import resolvers
 import shot_selectors
-from config import GlobalConfig, TestSnapshotIndex as tsi
-
 
 @torch.no_grad()
 def test(language_model, tokenizer, test_dataloader, shot_selector, truncator):
@@ -63,6 +61,11 @@ def main(args):
 
     # Datasets
     trainset, valset, testset = get_splited_dataset(args)
+    trainset = trainset[:100]
+    set_size = len(testset) // 2
+
+    valset = testset[:set_size]
+    testset = testset[set_size:]
 
     # Resolver & Verbalizer
     resolver_name = "_".join(args.dataset.split(","))
@@ -70,6 +73,7 @@ def main(args):
 
     # Dataloader
     random.shuffle(testset)
+    val_dataloader = DataModule(valset, resolver=resolver, batch_size=args.batch_size).get_dataloader()
     test_dataloader = DataModule(testset, resolver=resolver, batch_size=args.batch_size).get_dataloader()
 
     # Model
@@ -80,43 +84,52 @@ def main(args):
     # Truncator
     truncator = Truncator(tokenizer, 1024, 256)
 
-    M = len(shot_selector_trainset)
-    policy = MlpPolicy(1024, [2 * M, 2 * M], M, tsi.replace).cuda()
-    exp_name = get_exp_name(tsi)
+    M = len(trainset)
+    policy = MlpPolicy(1024, [M, M], M, True).cuda()
 
-    for shot_num in [12, 16]:
-        print(f">>>shot num {shot_num}>>>")
-        env = ClassificationEnv(
-            shot_selector_trainset,
-            tsi.tv_split_ratio == 0.0,
-            tokenizer,
-            truncator,
-            language_model,
-            resolver,
-            shot_num,
-            200.0,
-            180.0,
-        )
+    print(f">>>shot num {args.shot_num}>>>")
+    env = ClassificationEnv(
+        trainset,
+        True,
+        False,
+        tokenizer,
+        truncator,
+        language_model,
+        resolver,
+        args.shot_num,
+        200.0,
+        180.0,
+    )
 
-        for shot_selector_func in [shot_selectors.ours, shot_selectors.random, shot_selectors.closest]:
-            print(shot_selector_func)
+    for shot_selector_func in [shot_selectors.ours]:
+        print(shot_selector_func)
+        if shot_selector_func == shot_selectors.ours:
             for seed in range(4):
-                if shot_selector_func == shot_selectors.ours:
-                    tsi.seed = seed
-                    try:
-                        snapshot_path = f"result/{exp_name}/{tsi.seed}/itr_{tsi.epoch}.pt"
-                        print(snapshot_path)
-                        state_dict = torch.load(snapshot_path, map_location=get_device())
-                        policy.load_state_dict(state_dict)
-                        print(f"loading success from {snapshot_path}")
-                    except:
-                        pass
-                    shot_selector = shot_selector_func(shot_selector_trainset, shot_num, resolver=resolver, policy=policy, env=env)
-                else:
-                    shot_selector = shot_selector_func(trainset, shot_num, resolver=resolver, policy=policy, env=env)
-                acc = test(language_model, tokenizer, test_dataloader, shot_selector, truncator)
-                print(f"[{seed:1d}/4] Accuracy {acc:.3f}")
+                snapshot_path = f"result/OURS/{args.dataset}_sr0.0/{args.prompt}/sn{args.shot_num}_k5_lr0.001_bs4_inner/{seed}/itr_90.pt"
+                state_dict = torch.load(snapshot_path, map_location=get_device())
+                policy.load_state_dict(state_dict)
+
+                shot_selector = shot_selector_func(trainset, args.shot_num, resolver=resolver, policy=policy, env=env)
+                val_acc = test(language_model, tokenizer, val_dataloader, shot_selector, truncator)
+                test_acc = test(language_model, tokenizer, test_dataloader, shot_selector, truncator)
+                print(f"[{seed}/4] Val Acc {val_acc * 100:.1f} Test Accuracy {test_acc * 100:.1f}")
                 del shot_selector
+
+        elif shot_selector_func == shot_selectors.random:
+            for repeat in range(20):
+                shot_selector = shot_selector_func(trainset, args.shot_num, resolver=resolver)
+                val_acc = test(language_model, tokenizer, val_dataloader, shot_selector, truncator)
+                test_acc = test(language_model, tokenizer, test_dataloader, shot_selector, truncator)
+                print(f"[{repeat}/20] Val Acc {val_acc * 100:.1f} Test Accuracy {test_acc * 100:.1f}")
+                del shot_selector
+
+        elif shot_selector_func == shot_selectors.closest:
+            shot_selector = shot_selector_func(trainset, args.shot_num, resolver=resolver)
+            val_acc = test(language_model, tokenizer, val_dataloader, shot_selector, truncator)
+            test_acc = test(language_model, tokenizer, test_dataloader, shot_selector, truncator)
+            print(f"[0/1] Val Acc {val_acc * 100:.1f} Test Accuracy {test_acc * 100:.1f}")
+            del shot_selector
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -126,7 +139,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='super_glue,cb')
     parser.add_argument('--prompt', type=str, default='manual')
 
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--shot_num', type=int, default=2)
     args = parser.parse_args()
 
     main(args)

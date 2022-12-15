@@ -9,9 +9,11 @@ class ClassificationEnv:
     '''
     Classification Env which can manage multiple rollout
     '''
-    def __init__(self, trainset, inner_sample, tokenizer, truncator, language_model, resolver, shot_num, correct_coeff, incorrect_coeff):
+    def __init__(self, trainset, inner_sample, label_balance, tokenizer, truncator, language_model, resolver, shot_num, correct_coeff, incorrect_coeff):
         self.trainset = trainset
+        self.trainset_size = len(trainset)
         self.inner_sample = inner_sample
+        self.label_balance = label_balance
 
         self.tokenizer = tokenizer
         self.truncator = truncator
@@ -27,6 +29,21 @@ class ClassificationEnv:
 
         # TODO: fix it to recieve an embedder as a parameter
         self.embedder = SentenceTransformer('stsb-roberta-large')
+        self.init_label_mask()
+
+    def init_label_mask(self):
+        label_mask = torch.zeros(self.trainset_size, self.class_num)
+        trainset_label = torch.zeros(self.trainset_size, dtype=torch.long)
+        for idx, data in enumerate(self.trainset):
+            label = data['label']
+            label_mask[idx, label] = 1.0
+            trainset_label[idx] = label
+
+        self.base_label_mask = label_mask.unsqueeze(0)
+        self.trainset_label = trainset_label
+
+    def set_label_mask(self, batch_size):
+        self.batch_label_mask = self.base_label_mask.repeat(batch_size, 1, 1)
 
     def reset(self, resolved_batch, mode):
         '''
@@ -49,12 +66,15 @@ class ClassificationEnv:
         action_mask = torch.ones(self.batch_size, len(self.trainset), device=get_device())
         selected_indices = np.zeros((self.batch_size, self.shot_num))
 
-        if self.inner_sample:
+        if self.inner_sample and mode == 'train':
             action_mask[range(self.batch_size), indices] = 0
 
-        self.state = (0, resolved_inputs, action_mask, selected_indices)
+        self.set_label_mask(self.batch_size)
+        selected_class_mask = torch.zeros(self.batch_size, self.class_num)
 
-        embeddings = self.embedder.encode(resolved_inputs, convert_to_tensor=True,show_progress_bar=False)
+        self.state = (0, resolved_inputs, action_mask, selected_indices, selected_class_mask)
+
+        embeddings = self.embedder.encode(resolved_inputs, convert_to_tensor=True, show_progress_bar=False)
 
         if mode == 'train':
             self.label = resolved_batch['label']
@@ -64,9 +84,9 @@ class ClassificationEnv:
         return embeddings, action_mask
 
     def step(self, action):
-        stepn, cur_inputs, action_mask, selected_indices = self.state
+        stepn, cur_inputs, action_mask, selected_indices, selected_class_mask = self.state
         indices, replace = action
-        selected_indices[:,self.shot_num - 1 - stepn] = indices.detach().cpu().numpy()
+        selected_indices[:, self.shot_num - 1 - stepn] = indices.detach().cpu().numpy()
 
         if not replace:
             action_mask[range(self.batch_size), indices] = 0
@@ -85,7 +105,25 @@ class ClassificationEnv:
             cur_inputs = [newshot + concatenator + cur_input for newshot, cur_input in zip(resolved_newshots, cur_inputs)]
 
         stepn += 1
-        self.state = (stepn, cur_inputs, action_mask, selected_indices)
+
+        selected_classes = self.trainset_label[indices]
+        selected_class_mask[range(self.batch_size), selected_classes] = 1.0
+
+        if self.label_balance:
+            not_free = selected_class_mask.sum(dim=1) + (self.shot_num - stepn) <= self.class_num
+            not_free = not_free.long().unsqueeze(-1) # batch_size, 1
+
+            # self.batch_label_mask : batch_size, trainset_size, class_num
+            # selected_class_mask   : batch_size, class_num, 1
+
+            to_deactivate = torch.matmul(self.batch_label_mask, selected_class_mask.unsqueeze(-1)) # batch_size, trainset_size, 1
+            to_deactivate = to_deactivate.squeeze(-1) # batch_size, trainset_size
+            activate_mask = 1.0 - to_deactivate * not_free
+            # activate_mask = (1 - to_deactivate) * not_free  + (1.0 - not_free) # batch_size, trainset_size
+            #                 [1]  [bs, ts]         [bs, 1]      [1]   [bs, 1] 
+            action_mask = action_mask * activate_mask.cuda()
+
+        self.state = (stepn, cur_inputs, action_mask, selected_indices, selected_class_mask)
         done = stepn == self.shot_num
 
         if done and self.mode == 'train':
@@ -93,12 +131,13 @@ class ClassificationEnv:
             for i in range(self.batch_size):
                 shots = [self.trainset[int(idx)] for idx in selected_indices[i]]
                 resolved_shots_batch.append(self.resolver(shots))
+
             truncated_batch = self.truncator.truncate(resolved_shots_batch, self.input_batch)
             rewards = self._get_reward(truncated_batch)
         else:
             rewards = torch.zeros(self.batch_size)
 
-        embeddings = self.embedder.encode(cur_inputs, convert_to_tensor=True,show_progress_bar=False)
+        embeddings = self.embedder.encode(cur_inputs, convert_to_tensor=True, show_progress_bar=False)
 
         return (embeddings, action_mask), rewards
 

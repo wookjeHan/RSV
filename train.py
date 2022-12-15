@@ -28,12 +28,12 @@ def main(args):
 
     # Datasets
     trainset, valset, testset = get_splited_dataset(args)
+    trainset = trainset[:100]
+    valset = valset[:100]
 
     # Resolver & Verbalizer
     resolver_name = "_".join(args.dataset.split(","))
     resolver = getattr(getattr(resolvers, resolver_name), args.prompt)
-    sample_shot = resolver(trainset[0:1])
-    verbalizers = sample_shot['verbalizers']
 
     # Lauguage related models
     language_model = ClassificationModel(args.language_model)
@@ -43,14 +43,16 @@ def main(args):
 
     # Policies
     M = len(trainset)
-    policy = MlpPolicy(1024, [2 * M, 2 * M], M, replace=args.replace).to(device=device)
-    target_policy = MlpPolicy(1024, [2 * M, 2 * M], M, replace=args.replace).to(device=device)
+    policy = MlpPolicy(1024, [M, M], M, replace=args.replace).to(device=device)
+    target_policy = MlpPolicy(1024, [M, M], M, replace=args.replace).to(device=device)
 
     # Env
     inner_sample = args.tv_split_ratio == 0.0
+    label_balance = args.label_balance
     train_env = ClassificationEnv(
         trainset,
         inner_sample,
+        label_balance,
         tokenizer,
         truncator,
         language_model,
@@ -63,6 +65,7 @@ def main(args):
     test_env = ClassificationEnv(
         trainset,
         False,
+        label_balance,
         tokenizer,
         truncator,
         language_model,
@@ -86,7 +89,7 @@ def main(args):
         'shuffle': True,
         'soft_update_ratio': 1.0, # 1.0 for hard update, 0.0 for no update
         'update_period': 10,
-        'num_epochs': 200,
+        'num_epochs': 100,
         'temperature': args.temperature,
         'topk': args.topk,
     }
@@ -146,6 +149,7 @@ if __name__ == '__main__':
     parser.add_argument('--temperature', type=float, default=1.0)
     parser.add_argument('--tv_split_ratio', type=float, default=gc.tv_split_ratio)
     parser.add_argument('--replace', action='store_true')
+    parser.add_argument('--label_balance', action='store_true')
     parser.add_argument('--max_seq_len', type=int, default=1024)
     parser.add_argument('--max_sample_seq_len', type=int, default=256)
 
