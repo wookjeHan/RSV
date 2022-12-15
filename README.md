@@ -18,3 +18,22 @@ python test.py --dataset super_glue,cb --batch_size 4
 ```
 
 ## Results
+The test set accuracy of random and ours is measured with the setting which showed the best performance on the validation set.
+
+| cb      | random | closest  | ours     |
+|---------|--------|----------|----------|
+| 2 shots | 32.1   | 46.4     | **64.3** |
+| 3 shots | 35.7   | 53.6     | **75**   |
+| 4 shots | 53.6   | **57.1** | 46.4     |
+
+| boolq   | random | closest | ours     |
+|---------|--------|---------|----------|
+| 2 shots | 48.3   | 53.3    | **55**   |
+| 3 shots | 51.7   | 53.8    | **60.4** |
+| 4 shots | 57.1   | 54.3    | **60.2** |
+
+| sst2    | random | closest | ours     |
+|---------|--------|---------|----------|
+| 2 shots | 69.7   | 77.3    | **82.8** |
+| 3 shots | 73.4   | 75.9    | **82.6** |
+| 4 shots | 76.4   | 73.2    | **81.2** |
